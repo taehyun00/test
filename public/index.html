@@ -1,92 +1,43 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>모바일 NFC Reader</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-            background-color: #f0f0f0;
-        }
-
-        h1 {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            color: #333;
-            text-align: center;
-        }
-
-        #scan-button {
-            padding: 15px 20px;
-            font-size: 1.2em;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 300px;
-        }
-
-        #scan-button:hover {
-            background-color: #0056b3;
-        }
-
-        #message {
-            font-size: 1.2em;
-            color: #333;
-            text-align: center;
-        }
-    </style>
+    <title>NFC Reader</title>
 </head>
 <body>
-
-    <h1>NFC 카드 읽기</h1>
-    <button id="scan-button">NFC 스캔 시작</button>
-    <p id="message">NFC 스캔을 시작하려면 버튼을 누르세요</p>
+    <h1>NFC Reader</h1>
+    <button id="scan-button">Scan NFC</button>
+    <p id="nfc-output"></p>
 
     <script>
         document.getElementById('scan-button').addEventListener('click', async () => {
-            try {
-                const ndef = new NDEFReader();
-                await ndef.scan();
-                document.getElementById('message').textContent = "스캔 대기 중...";
-
-                ndef.onreading = event => {
-                    const { serialNumber } = event;
-                    document.getElementById('message').textContent = `NFC 태그 UID: ${serialNumber}`;
-
-                    // NFC 데이터 서버로 전송
-                    fetch('http://localhost:3000/nfc-data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ uid: serialNumber })
-                    }).then(response => {
-                        if (response.ok) {
-                            alert('데이터가 서버에 전송되었습니다!');
-                        } else {
-                            alert('데이터 전송 실패');
+            if ('NDEFReader' in window) {
+                try {
+                    const ndef = new NDEFReader();
+                    await ndef.scan();
+                    ndef.onreading = event => {
+                        const decoder = new TextDecoder();
+                        for (const record of event.message.records) {
+                            const nfcData = decoder.decode(record.data);
+                            document.getElementById('nfc-output').textContent = `NFC Data: ${nfcData}`;
+                            // 서버에 NFC 데이터를 POST로 전송
+                            fetch('/nfc-data', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ nfcData }),
+                            });
                         }
-                    });
-                };
-            } catch (error) {
-                document.getElementById('message').textContent = 'NFC 읽기 실패. 브라우저 또는 장치를 확인하세요.';
-                console.error('NFC 읽기 오류:', error);
+                    };
+                } catch (error) {
+                    console.error('NFC scan failed: ', error);
+                }
+            } else {
+                alert("NFC API not supported on this browser.");
             }
         });
     </script>
-
 </body>
 </html>
