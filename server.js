@@ -1,23 +1,43 @@
-// server.js
 const express = require('express');
-const path = require('path');
+const bodyParser = require('body-parser');
+const bwipjs = require('bwip-js');
+
 const app = express();
 const port = 3000;
 
-// 'public' 폴더에 있는 정적 파일을 제공
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(bodyParser.json());
+app.use(express.static('public')); // HTML 파일을 서비스하기 위한 폴더
 
-// NFC 데이터를 수신하는 엔드포인트
-app.use(express.json());
+// NFC 데이터를 받아 바코드를 생성
 app.post('/nfc-data', (req, res) => {
-    const { uid } = req.body;
-    console.log(`수신된 NFC UID: ${uid}`);
-    
-    // 여기서 받은 UID 데이터를 처리할 수 있습니다.
-    res.status(200).send('NFC 데이터 수신 완료');
+    const nfcData = req.body.nfcData;
+
+    if (!nfcData) {
+        return res.status(400).send('No NFC data received');
+    }
+
+    // 바코드 생성
+    bwipjs.toBuffer({
+        bcid: 'code128',       // 바코드 타입 (Code128 사용)
+        text: nfcData,         // NFC 시리얼 번호 또는 데이터
+        scale: 3,              // 바코드 크기
+        height: 10,            // 바코드 높이
+        includetext: true,     // 바코드 아래에 텍스트 포함 여부
+        textxalign: 'center',  // 텍스트 정렬
+    }, (err, png) => {
+        if (err) {
+            return res.status(500).send('Error generating barcode');
+        }
+
+        // 바코드 이미지 응답
+        res.writeHead(200, {
+            'Content-Type': 'image/png',
+            'Content-Length': png.length,
+        });
+        res.end(png);
+    });
 });
 
-// 서버 실행
 app.listen(port, () => {
-    console.log(`서버가 실행 중입니다: http://localhost:${port}`);
+    console.log(`Server is running on http://localhost:${port}`);
 });
